@@ -7,50 +7,57 @@ PORT = 65434
 def envoyer_commande(client, commande):
     """Envoie une commande au serveur et affiche la réponse"""
     print(f">> {commande}")
+    #envoie de la commande au serveur
     client.sendall(f"{commande}\r\n".encode('utf-8'))
     data = client.recv(1024)
     reponse = data.decode('utf-8')
     print(f"<< {reponse.strip()}")
     return reponse
 
-def envoyer_email(expediteur, destinataire, message):
-    """Envoie un email via SMTP"""
-    # Étape 1 : création socket cliente + connexion
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
+def envoyer_email():
+    """Ouvre une connexion SMTP et permet d'envoyer plusieurs mails avant QUIT."""
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        #connexion au serveur SMTP
+        client.connect((HOTE, PORT))
+        # Accueil serveur
+        data = client.recv(1024)
+        print(f"<< {data.decode('utf-8').strip()}")
+        print("\n--- Début de la communication SMTP ---\n")
+
+        # Interaction avec l'utilisateur pour envoyer plusieurs mails
+        while True:
+            print("=== Client SMTP - Envoi d'email ===\n")
+            choix = input("Tapez 'send' pour envoyer un mail ou 'quit' pour fermer la connexion : ").strip().lower()
+            if choix == "quit":
+                envoyer_commande(client, "QUIT")
+                break
+            elif choix == "send":
+                expediteur = input("Expéditeur: ")
+                destinataire = input("Destinataire: ")
+                message = input("Message: ")
+
+                # Envoi des commandes SMTP
+                envoyer_commande(client, f"MAIL FROM:<{expediteur}>")
+                envoyer_commande(client, f"RCPT TO:<{destinataire}>")
+                envoyer_commande(client, "DATA")
+
+                # Envoi du corps et terminaison DATA par un point
+                print(f">> {message}")
+                client.sendall(f"{message}\r\n".encode('utf-8'))
+                envoyer_commande(client, ".")
+                print("Mail envoyé dans cette session.")
+            else:
+                print("Commande non reconnue. Tapez 'send' ou 'quit'.")
+
+    except Exception as e:
+        print(f"Erreur de session SMTP: {e}")
+    finally:
         try:
-            # Connexion au serveur
-            client.connect((HOTE, PORT))
-            data = client.recv(1024)
-            reponse = data.decode('utf-8')
-            print(f"<< {reponse.strip()}")
-            
-            # Étape 2 : échanges (envoi/réception)
-            envoyer_commande(client, f"MAIL FROM:<{expediteur}>")
-            envoyer_commande(client, f"RCPT TO:<{destinataire}>")
-            envoyer_commande(client, "DATA")
-            
-            # Envoi du message
-            print(f">> {message}")
-            client.sendall(f"{message}\r\n".encode('utf-8'))
-            
-            # Fin du message
-            envoyer_commande(client, ".")
-            
-            # Étape 3 : fermeture
-            envoyer_commande(client, "QUIT")
-            
-            print("\nEmail envoyé avec succès!")
-            
-        except Exception as e:
-            print(f"Erreur lors de l'envoi: {e}")
+            client.close()
+        except Exception:
+            pass
 
 if __name__ == "__main__":
-    # Exemple d'envoi d'email
-    print("=== Client SMTP - Envoi d'email ===\n")
-    
-    expediteur = input("Expéditeur: ")
-    destinataire = input("Destinataire: ")
-    message = input("Message: ")
-    
-    print("\n--- Début de la communication SMTP ---\n")
-    envoyer_email(expediteur, destinataire, message)
+    # envoi d'un email
+    envoyer_email()

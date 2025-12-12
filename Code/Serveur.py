@@ -4,7 +4,7 @@ import os
 import socket
 
 """
-Auteurs       : Bohy, Abbadi, Cheraf (et les noms de ton trinôme si applicable)
+Auteurs       : Bohy, Abbadi, Cherraf (et les noms de ton trinôme si applicable)
 Promotion     : M1 STRI     Date          : Décembre 2025       Version       : 1.0 (SMTP Simple)
 
 DESCRIPTION :
@@ -35,7 +35,7 @@ HOTE = ''
 PORT = 65434
 DOSSIER_MAIL = 'Boîte_mail'
 
-
+stop_server = False
 
 def initialisation_serveur():   
     # On crée le dossier de stockage des mails s'il n'existe pas
@@ -48,19 +48,19 @@ def initialisation_serveur():
         ecoute.bind(('', PORT))
         # Etape 2 : ouverture du service
         ecoute.listen()
+        ecoute.settimeout(1.0)
     
-        while True:
+        while not stop_server:
             # Etape 3 : attente et acceptation d'une nouvelle connexion
-            service, addr = ecoute.accept()
+            try:
+                service, addr = ecoute.accept()
+            except socket.timeout:
+                continue
 
             # Dès que l'on accepte une connexion, on crée un thread pour gérer ce client
             thread_serveur = threading.Thread(target=gestion_client, args=(service, addr))
             thread_serveur.start()
 
-    # Etape 5 : fermeture socket de service
-    # (automatiquement par le with service)
-# Etape 6 : fermeture de la socket d'écoute
-# (automatiquement par le with ecoute)
 
 def gestion_client(service, adresse):
     # Gère la communication avec un client SMTP
@@ -149,8 +149,12 @@ def sauvegarder_message(expediteur, destinataire, contenu_message):
 
 
 if __name__ == "__main__":
-    print("=== Serveur SMTP - Démarrage du serveur ===\n")
-    initialisation_serveur()
+    print("=== Serveur SMTP - Démarrage du serveur === (ctrl+C pour arrêter)\n")
+    try:
+        initialisation_serveur()
+    except KeyboardInterrupt:
+        stop_server = True
+        print("\n>>> Arrêt demandé. Fermeture du serveur...(après que chaque thread ait terminé)\n")
 
 
 
