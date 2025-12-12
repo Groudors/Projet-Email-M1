@@ -1,5 +1,4 @@
 import threading
-import time
 import os
 import socket
 
@@ -13,7 +12,7 @@ une partie du protocole SMTP (Simple Mail Transfer Protocol - RFC 5321).
 
 FONCTIONNALITÉS (VERSION 1) :
    Architecture Serveur TCP Multithreadé :
-     Socket d'écoute sur le port 2525
+     Socket d'écoute sur le port 65434
      Gestion de chaque client dans un thread dédié  pour permettre des connexions simultanées sans blocage.
 
    Gestion des commandes SMTP :
@@ -25,9 +24,6 @@ FONCTIONNALITÉS (VERSION 1) :
    Stockage :
      Les courriels reçus sont sauvegardés dans des fichiers textes locaux, le nom du fichier correspond à l'adresse du destinataire (RCPT).
 
-UTILISATION :
-Lancer ce script, puis se connecter via un client Telnet ou le script de test automatisé fourni :
-$ telnet localhost 65434
 """
 
 # Configuration des valeurs de base

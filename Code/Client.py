@@ -1,5 +1,23 @@
 import socket
 
+"""
+Auteurs       : Bohy, Abbadi, Cherraf (et les noms de ton trinôme si applicable)
+Promotion     : M1 STRI     Date          : Décembre 2025       Version       : 1.0 (SMTP Simple)
+
+DESCRIPTION :
+Ce programme implémente un client SMTP basique respectant
+une partie du protocole SMTP (Simple Mail Transfer Protocol - RFC 5321).
+
+FONCTIONNALITÉS (VERSION 1) :
+    Connexion à un serveur SMTP sur le port 65434
+    Envoi de commandes SMTP :
+      MAIL FROM : Identification de l'expéditeur.
+      RCPT TO   : Identification du destinataire.
+      DATA      : Envoi du corps du message (terminé par un point '.').
+      QUIT      : Clôture propre de la connexion.
+
+"""
+
 # Configuration
 HOTE = 'localhost'
 PORT = 65434
