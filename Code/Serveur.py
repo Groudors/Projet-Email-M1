@@ -76,13 +76,15 @@ def gestion_client(service, adresse):
         data = service.recv(1024)
         if not data:
             break  # Connexion fermée par le client en cas d'erreur ou autre
-            
+        
         donnees = data.decode('utf-8').strip()
         print(f"[{adresse}] Reçu: {donnees}")
+        # Si le message précédant n'était pas "DATA", on envoie dans gestion_commandes pour trouver le type de commande
         if (mode_data==False):
             expediteur,destinataire,mode_data,contenu_message,Condition_fin_connection=gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_message)
             print(f"[{adresse}] Etat après commande: expediteur={expediteur}, destinataire={destinataire}, mode_data={mode_data}")
         
+        # Sinon, l'envoie de données et activé
         else:
             # En mode DATA, on collecte les lignes du message
             if donnees == ".":
@@ -102,6 +104,15 @@ def gestion_client(service, adresse):
 def gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_message):
     commande = donnees.upper().split()[0] 
     match commande:
+        # Gestion de EHLO (SMTP complexe non implémenté)
+        case "EHLO":
+            service.sendall(b"502 Command not implemented\r\n")
+
+        # Gestion de HELO (SMTP implémenté)
+        case "HELO":
+            # On répond 250 OK
+            service.sendall(b"250 Ok\r\n")
+            
         # Cas MAIL FROM:<adresse>
         case "MAIL":
             if "FROM:" in donnees.upper():
@@ -110,15 +121,18 @@ def gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_
             else:
                 service.sendall(b"501 Erreur syntaxe\r\n")
         
+        # Gestion reception du message
         case "RCPT":
+            #On vérifie qu'il s'agit bien de "RCPT TO"
             if "TO:" in donnees.upper():
                 destinataire = donnees.split("TO:",1)[1].strip().strip('<>')
                 service.sendall(b"250 Recipient OK\r\n")
             else:
                 service.sendall(b"501 Erreur syntaxe\r\n")
         
+        # Gestion de la 
         case "DATA":
-            service.sendall(b"354 Enter mail, end with '.' on a line by itself \r\n")
+            service.sendall(b"354 Envoyez votre mail, finissez avec un '.' sur une ligne seul \r\n")
             mode_data = True
         
         case "QUIT":
@@ -129,6 +143,8 @@ def gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_
             service.sendall(b"502 Command not implemented\r\n")
 
     return expediteur,destinataire,mode_data,contenu_message,True    
+
+
 
 def sauvegarder_message(expediteur, destinataire, contenu_message):
     #Sauvegarde le message dans un fichier correspondant au destinataire

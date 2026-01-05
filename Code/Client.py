@@ -43,6 +43,14 @@ def envoyer_email():
         print(f"<< {data.decode('utf-8').strip()}")
         print("\n--- Début de la communication SMTP ---\n")
 
+        # On essaie d'abord EHLO (qui devrait échouer avec 502)
+        print(">> Test EHLO...")
+        envoyer_commande(client, "EHLO localhost")
+        
+        # Puis on envoie HELO (qui devrait réussir avec 250)
+        print(">> Envoi HELO...")
+        envoyer_commande(client, "HELO localhost")
+        
         # Interaction avec l'utilisateur pour envoyer plusieurs mails
         while True:
             print("=== Client SMTP - Envoi d'email ===\n")
