@@ -3,23 +3,28 @@ import os
 import socket
 
 """
-Auteurs       : Bohy, Abbadi, Cherraf (et les noms de ton trinôme si applicable)
-Promotion     : M1 STRI     Date          : Décembre 2025       Version       : 1.0 (SMTP Simple)
+Auteurs       : Bohy, Abbadi, Cherraf 
+Promotion     : M1 STRI     Date          : Janvier 2026       Version       : 2.0 (SMTP Simple)
 
 DESCRIPTION :
 Ce programme implémente un serveur de messagerie électronique basique respectant
 une partie du protocole SMTP (Simple Mail Transfer Protocol - RFC 5321).
 
-FONCTIONNALITÉS (VERSION 1) :
+FONCTIONNALITÉS (VERSION 2.0) :
    Architecture Serveur TCP Multithreadé :
      Socket d'écoute sur le port 65434
      Gestion de chaque client dans un thread dédié  pour permettre des connexions simultanées sans blocage.
 
    Gestion des commandes SMTP :
+     EHLO      : Identification du client (retourne 502 - non implémenté).
+     HELO      : Identification du client (implémenté - retourne 250 OK).
      MAIL FROM : Identification de l'expéditeur.
      RCPT TO   : Identification du destinataire.
      DATA      : Réception du corps du message (terminé par un point '.').
      QUIT      : Clôture propre de la connexion.
+
+   Compatibilité :
+     Compatible avec les clients SMTP standards incluant Thunderbird.
 
    Stockage :
      Les courriels reçus sont sauvegardés dans des fichiers textes locaux, le nom du fichier correspond à l'adresse du destinataire (RCPT).
