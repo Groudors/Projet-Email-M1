@@ -1,0 +1,6 @@
+De: alice@infra.stri.com
+Pour: bob@test.infra.stri
+Message:
+test numéro 8000
+==================================================
+

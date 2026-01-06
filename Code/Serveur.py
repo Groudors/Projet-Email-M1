@@ -66,7 +66,7 @@ def initialisation_serveur():
 def gestion_client(service, adresse):
     # Gère la communication avec un client SMTP
 
-    print(f"Thread {threading.current_thread().name} : Connexion de l'adresse : {adresse}")
+    print(f"{threading.current_thread().name} : Connexion de l'adresse : {adresse}")
     
     # Envoie du message de confirmation de mise en place du service
     service.sendall(b"220 Service Ready\n")
@@ -83,12 +83,11 @@ def gestion_client(service, adresse):
             break  # Connexion fermée par le client en cas d'erreur ou autre
         
         donnees = data.decode('utf-8').strip()
-        print(f"[{adresse}] Reçu: {donnees}")
+        if donnees != ".":  
+            print(f"[{adresse}] Reçu: {donnees}")
         # Si le message précédant n'était pas "DATA", on envoie dans gestion_commandes pour trouver le type de commande
         if (mode_data==False):
             expediteur,destinataire,mode_data,contenu_message,Condition_fin_connection=gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_message)
-            print(f"[{adresse}] Etat après commande: expediteur={expediteur}, destinataire={destinataire}, mode_data={mode_data}")
-        
         # Sinon, l'envoie de données et activé
         else:
             # En mode DATA, on collecte les lignes du message
@@ -137,11 +136,11 @@ def gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_
         
         # Gestion de la 
         case "DATA":
-            service.sendall(b"354 Envoyez votre mail, finissez avec un '.' sur une ligne seul \r\n")
+            service.sendall(b"354 Envoyez votre mail. \r\n")
             mode_data = True
         
         case "QUIT":
-            service.sendall(b"221 Closing connection\r\n")
+            service.sendall(b"221 fermeture connexion\r\n")
             return expediteur,destinataire,mode_data,contenu_message,False  
 
         case _:
@@ -172,9 +171,3 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         stop_server = True
         print("\n>>> Arrêt demandé. Fermeture du serveur...(après que chaque thread ait terminé)\n")
-
-
-
-
-
-

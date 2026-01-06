@@ -1,4 +1,5 @@
 import socket
+import re 
 
 """
 Auteurs       : Bohy, Abbadi, Cherraf 
@@ -28,6 +29,11 @@ FONCTIONNALITÉS (VERSION 2.0) :
 HOTE = 'localhost'
 PORT = 65434
 
+def valider_email(email):
+    """Valide le format d'une adresse email"""
+    pattern = r'^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
 def envoyer_commande(client, commande):
     """Envoie une commande au serveur et affiche la réponse"""
     print(f">> {commande}")
@@ -50,11 +56,11 @@ def envoyer_email():
         print("\n--- Début de la communication SMTP ---\n")
 
         # On essaie d'abord EHLO (qui devrait échouer avec 502)
-        print(">> Test EHLO...")
+        print("...Test EHLO...")
         envoyer_commande(client, "EHLO localhost")
         
         # Puis on envoie HELO (qui devrait réussir avec 250)
-        print(">> Envoi HELO...")
+        print("...Test HELO...")
         envoyer_commande(client, "HELO localhost")
         
         # Interaction avec l'utilisateur pour envoyer plusieurs mails
@@ -66,8 +72,16 @@ def envoyer_email():
                 break
             elif choix == "send":
                 expediteur = input("Expéditeur: ")
+                while not valider_email(expediteur):
+                    expediteur = input("Email invalide, (format : exemple@domaine.com). Expéditeur: ")
+                
                 destinataire = input("Destinataire: ")
+                while not valider_email(destinataire):
+                    destinataire = input("Email invalide, (format : exemple@domaine.com). Destinataire: ")
                 message = input("Message: ")
+                while not message:
+                    print("Le message ne peut pas être vide. Veuillez saisir un message.")
+                    message = input("Message: ")
 
                 # Envoi des commandes SMTP
                 envoyer_commande(client, f"MAIL FROM:<{expediteur}>")
@@ -78,12 +92,12 @@ def envoyer_email():
                 print(f">> {message}")
                 client.sendall(f"{message}\r\n".encode('utf-8'))
                 envoyer_commande(client, ".")
-                print("Mail envoyé dans cette session.")
+                print("Mail envoyé avec succès.\n")
             else:
                 print("Commande non reconnue. Tapez 'send' ou 'quit'.")
 
     except Exception as e:
-        print(f"Erreur de session SMTP: {e}")
+        print(f"Erreur : {e}")
     finally:
         try:
             client.close()
