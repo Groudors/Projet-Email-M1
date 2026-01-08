@@ -67,40 +67,40 @@ def gestion_client(service, adresse):
     # Gère la communication avec un client SMTP
 
     print(f"{threading.current_thread().name} : Connexion de l'adresse : {adresse}")
+    with service:
+        # Envoie du message de confirmation de mise en place du service
+        service.sendall(b"220 Service Ready\n")
+        expediteur = None
+        destinataire = None
+        mode_data = False # Indique si on est en mode réception de données avec DATA
+        contenu_message = []
+        Condition_fin_connection=True
     
-    # Envoie du message de confirmation de mise en place du service
-    service.sendall(b"220 Service Ready\n")
-    expediteur = None
-    destinataire = None
-    mode_data = False # Indique si on est en mode réception de données avec DATA
-    contenu_message = []
-    Condition_fin_connection=True
-   
-    while Condition_fin_connection:
-        # On réceptionne des données du client
-        data = service.recv(1024)
-        if not data:
-            break  # Connexion fermée par le client en cas d'erreur ou autre
-        
-        donnees = data.decode('utf-8').strip()
-        if donnees != ".":  
-            print(f"[{adresse}] Reçu: {donnees}")
-        # Si le message précédant n'était pas "DATA", on envoie dans gestion_commandes pour trouver le type de commande
-        if (mode_data is False):
-            expediteur,destinataire,mode_data,contenu_message,Condition_fin_connection=gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_message)
-        # Sinon, l'envoie de données et activé
-        else:
-            # En mode DATA, on collecte les lignes du message
-            if donnees == ".":
-                service.sendall(b"250 OK\r\n")
-                # Fin de la saisie du message
-                mode_data = False
-                # Sauvegarde le message dans un fichier
-                sauvegarder_message(expediteur, destinataire, contenu_message)
-                contenu_message = []  # Réinitialise le contenu du message pour le prochain
+        while Condition_fin_connection:
+            # On réceptionne des données du client
+            data = service.recv(1024)
+            if not data:
+                break  # Connexion fermée par le client en cas d'erreur ou autre
+            
+            donnees = data.decode('utf-8').strip()
+            if donnees != ".":  
+                print(f"[{adresse}] Reçu: {donnees}")
+            # Si le message précédant n'était pas "DATA", on envoie dans gestion_commandes pour trouver le type de commande
+            if (mode_data is False):
+                expediteur,destinataire,mode_data,contenu_message,Condition_fin_connection=gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_message)
+            # Sinon, l'envoie de données et activé
             else:
-                # Ajoute la ligne au contenu du message
-                contenu_message.append(donnees)
+                # En mode DATA, on collecte les lignes du message
+                if donnees == ".":
+                    service.sendall("250 OK\r\n".encode('utf-8'))
+                    # Fin de la saisie du message
+                    mode_data = False
+                    # Sauvegarde le message dans un fichier
+                    sauvegarder_message(expediteur, destinataire, contenu_message)
+                    contenu_message = []  # Réinitialise le contenu du message pour le prochain
+                else:
+                    # Ajoute la ligne au contenu du message
+                    contenu_message.append(donnees)
 
 
             
@@ -110,42 +110,41 @@ def gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_
     match commande:
         # Gestion de EHLO (SMTP complexe non implémenté)
         case "EHLO":
-            service.sendall(b"502 Command not implemented\r\n")
+            service.sendall("502 Command not implemented\r\n".encode('utf-8'))
 
         # Gestion de HELO (SMTP implémenté)
         case "HELO":
             # On répond 250 OK
-            service.sendall(b"250 Ok\r\n")
+            service.sendall("250 Ok\r\n".encode('utf-8'))
             
         # Cas MAIL FROM:<adresse>
         case "MAIL":
             if "FROM:" in donnees.upper():
                 expediteur = donnees.split("FROM:",1)[1].strip().strip('<>')
-                service.sendall(b"250 Sender OK\r\n")
+                service.sendall("250 Sender OK\r\n".encode('utf-8'))
             else:
-                service.sendall(b"501 Erreur syntaxe\r\n")
+                service.sendall("501 Erreur syntaxe\r\n".encode('utf-8'))
         
         # Gestion reception du message
         case "RCPT":
             #On vérifie qu'il s'agit bien de "RCPT TO"
             if "TO:" in donnees.upper():
                 destinataire = donnees.split("TO:",1)[1].strip().strip('<>')
-                service.sendall(b"250 Recipient OK\r\n")
+                service.sendall("250 Recipient OK\r\n".encode('utf-8'))
             else:
-                service.sendall(b"501 Erreur syntaxe\r\n")
+                service.sendall("501 Erreur syntaxe\r\n".encode('utf-8'))
         
         # Gestion de la commande DATA 
         case "DATA":
-            service.sendall(b"354 Envoyez votre mail. \r\n")
+            service.sendall("354 Envoyez votre mail. \r\n".encode('utf-8'))
             mode_data = True
         
         case "QUIT":
-            service.sendall(b"221 fermeture connexion\r\n")
+            service.sendall("221 fermeture connexion\r\n".encode('utf-8'))
             return expediteur,destinataire,mode_data,contenu_message,False  
 
         case _:
-            service.sendall(b"502 Command not implemented\r\n")
-
+            service.sendall("502 Command not implemented\r\n".encode('utf-8'))
     return expediteur,destinataire,mode_data,contenu_message,True    
 
 
