@@ -86,7 +86,7 @@ def gestion_client(service, adresse):
         if donnees != ".":  
             print(f"[{adresse}] Reçu: {donnees}")
         # Si le message précédant n'était pas "DATA", on envoie dans gestion_commandes pour trouver le type de commande
-        if (mode_data==False):
+        if (mode_data is False):
             expediteur,destinataire,mode_data,contenu_message,Condition_fin_connection=gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_message)
         # Sinon, l'envoie de données et activé
         else:
@@ -134,7 +134,7 @@ def gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_
             else:
                 service.sendall(b"501 Erreur syntaxe\r\n")
         
-        # Gestion de la 
+        # Gestion de la commande DATA 
         case "DATA":
             service.sendall(b"354 Envoyez votre mail. \r\n")
             mode_data = True
@@ -153,7 +153,7 @@ def gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_
 def sauvegarder_message(expediteur, destinataire, contenu_message):
     #Sauvegarde le message dans un fichier correspondant au destinataire
 
-    if destinataire!=None and expediteur!=None:
+    if destinataire is not None and expediteur is not None:
         fichier_mail = os.path.join(DOSSIER_MAIL, f"{destinataire}.txt")
         with open(fichier_mail, 'a', encoding='utf-8') as f:
             f.write(f"De: {expediteur}\n")
