@@ -1,6 +1,0 @@
-De: alice@infra.tamere
-Pour: bob@tamere.infra
-Message:
-test
-==================================================
-
