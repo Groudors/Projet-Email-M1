@@ -2,14 +2,14 @@ import socket
 import re 
 
 """
-Auteurs       : Bohy, Abbadi, Cherraf 
-Promotion     : M1 STRI     Date          : Janvier 2026       Version       : 2.0 (SMTP Simple)
+Auteurs: Bohy, Abbadi, Cherraf 
+Promotion: M1 STRI     Date  : Janvier 2026       Version : 2.0 (SMTP Simple)
 
 DESCRIPTION :
 Ce programme implémente un client SMTP basique respectant
 une partie du protocole SMTP (Simple Mail Transfer Protocol - RFC 5321).
 
-FONCTIONNALITÉS (VERSION 2.0) :
+FONCTIONNALITÉS (VERSION 3.0) :
     Connexion à un serveur SMTP sur le port 65434
     Envoi de commandes SMTP :
       EHLO      : Identification du client (test - non implémenté sur le serveur).
@@ -18,6 +18,12 @@ FONCTIONNALITÉS (VERSION 2.0) :
       RCPT TO   : Identification du destinataire.
       DATA      : Envoi du corps du message (terminé par un point '.').
       QUIT      : Clôture propre de la connexion.
+
+      Ajout POP3 : 
+       - QUIT : permet de fermer la connexion proprement.
+       - STAT : permet d'obtenir le nombre de messages et la taille totale.
+       - LIST : permet d'obtenir la liste des messages avec leur taille.
+       - RETR n : permet de récupérer le message n.
 
     Compatibilité :
       Compatible avec les serveurs SMTP standards incluant celui du projet.
@@ -29,13 +35,13 @@ FONCTIONNALITÉS (VERSION 2.0) :
 HOTE = 'localhost'
 PORT = 65434
 
+# Fonction de validation d'email simple
 def valider_email(email):
-    """Valide le format d'une adresse email"""
     pattern = r'^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return re.match(pattern, email) is not None
 
+#    Envoie une commande SMTP au serveur et affiche la réponse
 def envoyer_commande(client, commande):
-    """Envoie une commande au serveur et affiche la réponse"""
     print(f">> {commande}")
     #envoie de la commande au serveur
     client.sendall(f"{commande}\r\n".encode('utf-8'))
@@ -44,8 +50,18 @@ def envoyer_commande(client, commande):
     print(f"<< {reponse.strip()}")
     return reponse
 
+    # Envoie une commande POP3 au serveur et renvoie la réponse
+def envoyer_commande_pop3(client, commande):
+    print(f">> {commande}")
+    #envoie de la commande au serveur
+    client.sendall(f"{commande}\r\n".encode('utf-8'))
+    data = client.recv(1024)
+    reponse = data.decode('utf-8')
+    print(f"<< {reponse.strip()}")
+    return reponse
+
+# Fonction principale pour envoyer un email via SMTP et interagir en POP3
 def envoyer_email():
-    """Ouvre une connexion SMTP et permet d'envoyer plusieurs mails avant QUIT."""
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         #connexion au serveur SMTP
@@ -66,10 +82,14 @@ def envoyer_email():
         # Interaction avec l'utilisateur pour envoyer plusieurs mails
         while True:
             print("=== Client SMTP - Envoi d'email ===\n")
-            choix = input("Tapez 'send' pour envoyer un mail ou 'quit' pour fermer la connexion : ").strip().lower()
+            choix = input("Tapez 'send' pour envoyer un mail, 'rcv' pour recevoir des informations, 'quit' pour fermer la connexion : ").strip().lower()
+            
+            #cas QUIT
             if choix == "quit":
                 envoyer_commande(client, "QUIT")
                 break
+
+            # Cas SMTP
             elif choix == "send":
                 expediteur = input("Expéditeur: ")
                 while not valider_email(expediteur):
@@ -93,6 +113,55 @@ def envoyer_email():
                 client.sendall(f"{message}\r\n".encode('utf-8'))
                 envoyer_commande(client, ".")
                 print("Mail envoyé avec succès.\n")
+
+            # Cas POP3
+            elif choix == "rcv":
+                print("=== Client POP3 - Réception d'informations ===\n")
+                choixmailpop3=input ("Veuillez saisir le mail de la personne que vous souhaitez consulter : ")
+                while not valider_email(choixmailpop3):
+                    choixmailpop3 = input("Email invalide, (format : exemple@domaine.com). Veuillez saisir le mail de la personne que vous souhaitez consulter : ")
+
+                choixcommandepop3 = input("Veuillez choisir l'une des commandes suivantes : \n'stat' pour obtenir le nombre de messages et la taille totale \n" \
+                "'list' pour obtenir la liste des messages avec leur taille\n " \
+                "'retr n' pour récupérer le message d'indice n : ").strip().lower()
+
+                if choixcommandepop3 == "stat":
+                    retour = envoyer_commande_pop3(client, "STAT " + choixmailpop3)
+                    parts = retour.split()
+                    if len(parts) >= 2:
+                        print(f"Nombre de messages : {parts[0]}, Taille totale : {parts[1]} octets")
+
+                elif choixcommandepop3 == "list":
+                    retour = envoyer_commande_pop3(client, "LIST " + choixmailpop3)
+                    print("Liste id messages et leurs tailles :\n")
+                    nettoye = retour.replace('[', '').replace(']', '')
+                    if len(nettoye.strip()) > 0:
+                        elements = nettoye.split(',')
+                        try:
+                            for i in range(0, len(elements), 2):
+                                uid = elements[i].strip()
+                                taille = elements[i+1].strip()
+                                print(f"   {uid:<5} | {taille:<15}\n")
+                        except IndexError:
+                            print("   (Problème de formatage des données)\n")
+                    else:
+                        print("   (Aucun message)\n")
+
+
+                elif choixcommandepop3.split()[0] == "retr":
+                    partspop3 = choixcommandepop3.split()
+                    if len(partspop3) == 2 and partspop3[1].isdigit():
+                        retour = envoyer_commande(client, f"RETR {partspop3[1]} {choixmailpop3}")
+                    else:
+                        print("Usage incorrect de RETR")
+                    print("Message récupéré :\n")
+                    print(retour) 
+                    print ("\n")   
+
+
+                else:
+                    print("Commande non reconnue. Tapez 'stat', 'list' ou 'retr n'.")
+
             else:
                 print("Commande non reconnue. Tapez 'send' ou 'quit'.")
 

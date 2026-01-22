@@ -1,0 +1,6 @@
+De: alice@infra.stri
+Pour: pierre@infra.stri
+Message:
+yo
+==================================================
+
