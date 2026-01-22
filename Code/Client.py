@@ -50,16 +50,6 @@ def envoyer_commande(client, commande):
     print(f"<< {reponse.strip()}")
     return reponse
 
-    # Envoie une commande POP3 au serveur et renvoie la réponse
-def envoyer_commande_pop3(client, commande):
-    print(f">> {commande}")
-    #envoie de la commande au serveur
-    client.sendall(f"{commande}\r\n".encode('utf-8'))
-    data = client.recv(1024)
-    reponse = data.decode('utf-8')
-    print(f"<< {reponse.strip()}")
-    return reponse
-
 # Fonction principale pour envoyer un email via SMTP et interagir en POP3
 def envoyer_email():
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -121,43 +111,46 @@ def envoyer_email():
                 while not valider_email(choixmailpop3):
                     choixmailpop3 = input("Email invalide, (format : exemple@domaine.com). Veuillez saisir le mail de la personne que vous souhaitez consulter : ")
 
-                choixcommandepop3 = input("Veuillez choisir l'une des commandes suivantes : \n'stat' pour obtenir le nombre de messages et la taille totale \n" \
-                "'list' pour obtenir la liste des messages avec leur taille\n " \
-                "'retr n' pour récupérer le message d'indice n : ").strip().lower()
+                choixcommandepop3 = input("Veuillez choisir l'une des commandes suivantes : \n- 'stat' pour obtenir le nombre de messages et la taille totale \n" \
+                "- 'list' pour obtenir la liste des messages avec leur taille\n" \
+                "- 'retr n' pour récupérer le message d'indice n : ").strip().lower()
 
                 if choixcommandepop3 == "stat":
-                    retour = envoyer_commande_pop3(client, "STAT " + choixmailpop3)
+                    retour = envoyer_commande(client, "STAT " + choixmailpop3)
                     parts = retour.split()
                     if len(parts) >= 2:
-                        print(f"Nombre de messages : {parts[0]}, Taille totale : {parts[1]} octets")
+                        print(f"\n=== Statistiques ===")
+                        print(f"Nombre de messages : {parts[0]}")
+                        print(f"Taille totale : {parts[1]} octets\n")
 
                 elif choixcommandepop3 == "list":
-                    retour = envoyer_commande_pop3(client, "LIST " + choixmailpop3)
-                    print("Liste id messages et leurs tailles :\n")
+                    retour = envoyer_commande(client, "LIST " + choixmailpop3)
+                    print("\n=== Liste des messages ===")
                     nettoye = retour.replace('[', '').replace(']', '')
                     if len(nettoye.strip()) > 0:
                         elements = nettoye.split(',')
+                        print(f"\n{'ID':<10} | {'Expéditeur':<25} | {'Taille (octets)':<20}")
+                        print("-" * 60)
                         try:
-                            for i in range(0, len(elements), 2):
+                            for i in range(0, len(elements), 3):
                                 uid = elements[i].strip()
-                                taille = elements[i+1].strip()
-                                print(f"   {uid:<5} | {taille:<15}\n")
+                                expediteur = elements[i+1].strip().strip("'\"")
+                                taille = elements[i+2].strip()
+                                print(f"{uid:<10} | {expediteur:<25} | {taille:<20}")
                         except IndexError:
-                            print("   (Problème de formatage des données)\n")
+                            print("   (Problème de formatage des données)")
+                        print()
                     else:
                         print("   (Aucun message)\n")
-
 
                 elif choixcommandepop3.split()[0] == "retr":
                     partspop3 = choixcommandepop3.split()
                     if len(partspop3) == 2 and partspop3[1].isdigit():
-                        retour = envoyer_commande(client, f"RETR {partspop3[1]} {choixmailpop3}")
+                        print()
+                        envoyer_commande(client, f"RETR {partspop3[1]} {choixmailpop3}")
+                        print()
                     else:
-                        print("Usage incorrect de RETR")
-                    print("Message récupéré :\n")
-                    print(retour) 
-                    print ("\n")   
-
+                        print("\nUsage incorrect de RETR\n")
 
                 else:
                     print("Commande non reconnue. Tapez 'stat', 'list' ou 'retr n'.")

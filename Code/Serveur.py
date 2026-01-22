@@ -89,13 +89,7 @@ def gestion_client(service, adresse):
 
             # Si le message précédant n'était pas "DATA", on envoie dans gestion_commandes pour trouver le type de commande
             if (mode_data is False):
-                if (donnees.upper().split()[0] =="STAT" or donnees.upper().split()[0] =="LIST" or donnees.upper().split()[0] =="RETR"):
-                    if donnees.upper().split()[0] =="STAT" or donnees.upper().split()[0] =="LIST":
-                        destinataire = donnees.split()[1].strip().strip('<>')
-                    else:
-                        destinataire = donnees.split()[2].strip().strip('<>')
-                    dictionnaire_mails = charger_boite_mail(destinataire)
-                expediteur,destinataire,mode_data,contenu_message,Condition_fin_connection=gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_message,dictionnaire_mails)
+                expediteur,destinataire,mode_data,contenu_message,Condition_fin_connection=gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_message)
            
             # Sinon, l'envoie de données est activé
             else:
@@ -112,7 +106,8 @@ def gestion_client(service, adresse):
                     contenu_message.append(donnees)
 
 
-def gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_message,dictionnaire_mails):
+def gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_message):
+    # Plus besoin de passer dictionnaire_mails, on le charge dans les cases qui en ont besoin
     commande = donnees.upper().split()[0] 
     match commande:
         # Gestion de EHLO (SMTP complexe non implémenté)
@@ -154,27 +149,50 @@ def gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_
         # puis il faudra juste que tu intègre appelle les fonctions correspondantes dans les cases suivants avec le dictionnaire.
         # en renvoyant les résultats vers le client (idem de comment c'est gêrer au dessus)
         case "STAT":
-            destinataire = donnees.split("STAT:",1)[1].strip().strip('<>')
-            nbr, taille = commande_stat(dictionnaire_mails)
-            service.sendall(f"{nbr} {taille}\r\n".encode('utf-8'))
+            # Format reçu: "STAT email@domain.com"
+            parties = donnees.split()
+            if len(parties) >= 2:
+                destinataire = parties[1]
+                dictionnaire_mails = charger_boite_mail(destinataire)
+                if dictionnaire_mails is not None:
+                    nbr, taille = commande_stat(dictionnaire_mails)
+                    service.sendall(f"{nbr} {taille}\r\n".encode('utf-8'))
+                else:
+                    service.sendall("Erreur : Boîte mail inexistante\r\n".encode('utf-8'))
+            else:
+                service.sendall("501 Erreur syntaxe\r\n".encode('utf-8'))
         
         case "LIST":
-            destinataire = donnees.split("LIST:",1)[1].strip().strip('<>')
-            liste_mail = commande_list(dictionnaire_mails)
-            service.sendall(f"{liste_mail}\r\n".encode('utf-8'))
+            # Format reçu: "LIST email@domain.com"
+            parties = donnees.split()
+            if len(parties) >= 2:
+                destinataire = parties[1]
+                dictionnaire_mails = charger_boite_mail(destinataire)
+                if dictionnaire_mails is not None:
+                    liste_mail = commande_list(dictionnaire_mails)
+                    service.sendall(f"{liste_mail}\r\n".encode('utf-8'))
+                else:
+                    service.sendall("Erreur : Boîte mail inexistante\r\n".encode('utf-8'))
+            else:
+                service.sendall("501 Erreur syntaxe\r\n".encode('utf-8'))
         
         case "RETR":
-            separation = donnees.split()
-            indice_msg = int(separation[1])
-            destinataire = separation[2].strip().strip('<>')
-            
-            if not validation_id(indice_msg, dictionnaire_mails):
-                service.sendall("Erreur : Ce destinataire n'a pas d'email\r\n".encode('utf-8'))
-            elif not validation_email(destinataire, dictionnaire_mails):
-                service.sendall("Erreur : Cet email n'existe pas'\r\n".encode('utf-8'))
-            else : 
-                message = commande_retr(dictionnaire_mails, indice_msg)
-                service.sendall(f"{message}\r\n".encode('utf-8'))
+            # Format reçu: "RETR indice email@domain.com"
+            parties = donnees.split()
+            if len(parties) >= 3 and parties[1].isdigit():
+                indice_msg = int(parties[1])
+                destinataire = parties[2]
+                dictionnaire_mails = charger_boite_mail(destinataire)
+                
+                if dictionnaire_mails is None:
+                    service.sendall("Erreur : Boîte mail inexistante\r\n".encode('utf-8'))
+                elif not validation_id(indice_msg, dictionnaire_mails):
+                    service.sendall("Erreur : ID message inexistant\r\n".encode('utf-8'))
+                else:
+                    message = commande_retr(dictionnaire_mails, indice_msg)
+                    service.sendall(f"{message}\r\n".encode('utf-8'))
+            else:
+                service.sendall("501 Erreur syntaxe. Format: RETR indice email@domain.com\r\n".encode('utf-8'))
 
         case _:
             service.sendall("502 Command not implemented\r\n".encode('utf-8'))
@@ -198,31 +216,29 @@ def sauvegarder_message(expediteur, destinataire, contenu_message):
 # Partie Commandes POP3
 
 def commande_stat( dictionnaire_mails):
+    nombre_messages = len(dictionnaire_mails)
+    taille_totale = 0
     for id in dictionnaire_mails:
-        nombre_messages = len(dictionnaire_mails)
-        taille_totale = 0
-        for id in dictionnaire_mails:
-            taille_totale += dictionnaire_mails[id]['taille']
+        taille_totale += dictionnaire_mails[id]['taille']
     return nombre_messages, taille_totale
 
 def commande_list(dictionnaire_mails):
-    liste_messages= [[id, dictionnaire_mails[id]['taille']] for id in dictionnaire_mails]
+    # Retourne ID, expéditeur et taille
+    liste_messages = [[id, dictionnaire_mails[id].get('expediteur', 'Inconnu'), dictionnaire_mails[id]['taille']] for id in dictionnaire_mails]
     return liste_messages
 
 def commande_retr(dictionnaire_mails, id):
-    return dictionnaire_mails[id]['messages'][id]
+    return dictionnaire_mails[id]['contenu']
 
 
 
 # Partie Vérification 
 def validation_email(email, dictionnaire_mails):
-    if email not in dictionnaire_mails:
-        return False
+    return email in dictionnaire_mails  
     
 def validation_id(id, dictionnaire_mails):
-    if id not in dictionnaire_mails:
-        return False
-
+    return id in dictionnaire_mails
+        
 # Dictionnaire_mails est un dictionnaire de dictionnaires
 # La clé du dictionnaire principal est l'id du destinataire et la
 #  valeur est un dictionnaire contenant les messages et la taille du message
@@ -239,12 +255,22 @@ def charger_boite_mail(adresse_mail):
     # Sépare les mails par le délimiteur
     messages = contenu_complet.split("="*50)
     
+    id_mail = 1
     # Traite tous les messages sauf le dernier (qui est vide après le split)
     for message in messages[:-1]:
         # Calcule la taille avant le nettoyage
         taille = len(message.encode('utf-8'))
         message_nettoye = message.strip()
+        
+        # Extrait l'expéditeur de la ligne "De: ..."
+        expediteur = "Inconnu"
+        for ligne in message_nettoye.split('\n'):
+            if ligne.startswith('De:'):
+                expediteur = ligne.replace('De:', '').strip()
+                break
+        
         boite_mail[id_mail] = {
+            "expediteur": expediteur,
             "contenu": message_nettoye,
             "taille": taille
         }
