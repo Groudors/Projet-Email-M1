@@ -51,7 +51,7 @@ def envoyer_commande(client, commande):
     return reponse
 
 def verification_retour(reponse):
-    return reponse[0]=="502"
+    return reponse[0]=="501"
 
 # Fonction principale pour envoyer un email via SMTP et interagir en POP3
 def envoyer_email():
@@ -129,16 +129,17 @@ def envoyer_email():
                         print(f"Nombre de messages : {parts[0]}")
                         print(f"Taille totale : {parts[1]} octets\n")
 
+
                 elif choixcommandepop3 == "list":
                     retour = envoyer_commande(client, "LIST " + choixmailpop3)
                     print("\n=== Liste des messages ===")
-                    nettoye = retour.replace('[', '').replace(']', '')
-                    print(parts)
-                    if verification_retour(nettoye):
-                        print(f"{parts}\n")
+                    parts = retour.split()
+                    if verification_retour(parts):
+                        print(f"{retour}\n")
                         continue
-                    elif len(nettoye.strip()) > 0:
-                        elements = nettoye.split(',')
+
+                    elif len(parts) > 1:
+                        elements = retour.split(',')
                         print(f"\n{'ID':<10} | {'Expéditeur':<25} | {'Taille (octets)':<20}")
                         print("-" * 60)
                         try:
