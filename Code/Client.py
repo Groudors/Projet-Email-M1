@@ -3,7 +3,7 @@ import re
 
 """
 Auteurs: Bohy, Abbadi, Cherraf 
-Promotion: M1 STRI     Date  : Janvier 2026       Version : 2.0 (SMTP Simple)
+Promotion: M1 STRI     Date  : Janvier 2026       Version : 3.0
 
 DESCRIPTION :
 Ce programme implémente un client SMTP basique respectant
@@ -51,52 +51,63 @@ def envoyer_commande(client, commande):
     return reponse
 
 def verification_retour(reponse):
-    return reponse[0]=="501"
-
+    return reponse.startswith("-ERR")
 
 
 def gestion_commande_list(retour):
-    parts = retour.split()
-    
-    if verification_retour(parts):
+    if verification_retour(retour):
         print(f" Retour impossible : {retour}\n")
         return
-    elif len(parts) > 1:
-        print("\n=== Liste des messages ===")
-        elements = retour.split(',')
-        print(f"\n{'ID':<10} | {'Expéditeur':<25} | {'Taille (octets)':<20}")
-        print("-" * 60)
-        try:
-            for i in range(0, len(elements), 3):
-                uid = elements[i].strip().strip("[").strip("]")
-                expediteur = elements[i+1].strip().strip("'\"")
-                taille = elements[i+2].strip().strip("[").strip("]")
+    
+    # Enlève le préfixe "+OK " et parse la liste
+    contenu = retour[4:].strip()  
+    
+    try:
+        # Évalue la chaîne comme une liste 
+        liste_messages = eval(contenu)
+        
+        if liste_messages:
+            print("\n=== Liste des messages ===")
+            print(f"\n{'ID':<10} | {'Expéditeur':<25} | {'Taille (octets)':<20}")
+            print("-" * 60)
+            for msg in liste_messages:
+                uid = msg[0]
+                expediteur = msg[1]
+                taille = msg[2]
                 print(f"{uid:<10} | {expediteur:<25} | {taille:<20}")
-        except IndexError:
-            print("   (Problème de formatage des données) \n")
+        else:
+            print("\nAucun message dans la boîte mail.\n")
+    except Exception as e:
+        print(f"Erreur lors du parsing de la liste : {e}\n")
+    print()
+
 
 def gestion_commande_stat(retour):
-    parts = retour.split()
-    if verification_retour(parts):
+    if verification_retour(retour):
         print("\n===  Retour Impossible  === \n")
         print(f"  {retour}\n")
         return
-    elif len(parts) >= 2:
+    
+    # Enlève le préfixe "+OK " et parse les données
+    contenu = retour[4:].strip()  
+    parts = contenu.split()
+    
+    if len(parts) >= 2:
         print(f"\n=== Statistiques === \n")
         print(f"Nombre de messages : {parts[0]}")
         print(f"Taille totale : {parts[1]} octets\n")
 
+
 def gestion_commande_retr(retour):
-    parts = retour.split()
-    if verification_retour(parts):
+    if verification_retour(retour):
         print(f"{retour}\n")
         return
-    else : 
-        print("\n=== Contenu du message ===\n")
-        message_lines = retour.split('\\n')
-        for line in message_lines:
-            print(line)
-        print()
+    
+    # Enlève le préfixe "+OK " pour afficher le message
+    contenu = retour[4:].strip()  # Enlève "+OK "
+    print("\n=== Contenu du message ===\n")
+    print(contenu)
+    print()
 
 def choix_send():
     expediteur = input("Expéditeur: ")
@@ -112,85 +123,115 @@ def choix_send():
         print("Le message ne peut pas être vide. Veuillez saisir un message.")
         message = input("Message: ")
     return expediteur, destinataire, message
-    
+
+
+def traiter_commande_send(client, expediteur, destinataire, message):
+    """Traite l'envoi d'un email via SMTP"""
+    envoyer_commande(client, f"MAIL FROM:<{expediteur}>")
+    envoyer_commande(client, f"RCPT TO:<{destinataire}>")
+    envoyer_commande(client, "DATA")
+
+    print(f">> {message}")
+    client.sendall(f"{message}\r\n".encode('utf-8'))
+    envoyer_commande(client, ".")
+    print("Mail envoyé avec succès.\n")
+
+
+def traiter_commande_pop3(client_pop3, choixcommandepop3, choixmailpop3):
+    """Traite une commande POP3 (STAT, LIST, RETR)"""
+    if choixcommandepop3 == "stat":
+        retour = envoyer_commande(client_pop3, "STAT " + choixmailpop3)
+        gestion_commande_stat(retour)
+
+    elif choixcommandepop3 == "list":
+        retour = envoyer_commande(client_pop3, "LIST " + choixmailpop3) 
+        gestion_commande_list(retour)
+
+    elif choixcommandepop3.split()[0] == "retr":
+        partspop3 = choixcommandepop3.split() 
+        if (len(partspop3) == 2 and partspop3[1].isdigit()):
+            retour = envoyer_commande(client_pop3, f"RETR {partspop3[1]} {choixmailpop3}")
+            gestion_commande_retr(retour)
+        else:
+            print("\nUsage incorrect de RETR. Format: retr n\n")
+    else:
+        print("Commande non reconnue. Tapez 'stat', 'list', 'retr n' ou 'back'.\n")
+
+
+def session_pop3(choixmailpop3):
+    """Gère une session POP3 complète"""
+    client_pop3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    pop3_active = False
+    try:
+        client_pop3.connect((HOTE, 65433))
+        pop3_active = True
+        
+        data = client_pop3.recv(1024)
+        print(f"<< {data.decode('utf-8').strip()}\n")
+        
+        # Boucle pour permettre plusieurs commandes POP3
+        while pop3_active:
+            choixcommandepop3 = input("Veuillez choisir l'une des commandes suivantes : \n- 'stat' pour obtenir le nombre de messages et la taille totale \n" \
+            "- 'list' pour obtenir la liste des messages avec leur taille\n" \
+            "- 'retr n' pour récupérer le message d'indice n\n" \
+            "- 'back' pour revenir au menu SMTP : ").strip().lower()
+
+            if choixcommandepop3 == "back":
+                envoyer_commande(client_pop3, "QUIT")
+                pop3_active = False
+            else:
+                traiter_commande_pop3(client_pop3, choixcommandepop3, choixmailpop3)
+        
+    except Exception as e:
+        print(f"Erreur connexion POP3 : {e}")
+    finally:
+        try:
+            if pop3_active:
+                client_pop3.close()
+        except:
+            pass
+
 
 # Fonction principale pour envoyer un email via SMTP et interagir en POP3
 def envoyer_email():
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        #connexion au serveur SMTP
+        # Connexion au serveur SMTP
         client.connect((HOTE, PORT))
-        # Accueil serveur
         data = client.recv(1024)
         print(f"<< {data.decode('utf-8').strip()}")
         print("\n--- Début de la communication SMTP ---\n")
 
-        # On essaie d'abord EHLO (qui devrait échouer avec 502)
+        # Test EHLO et HELO
         print("...Test EHLO...")
         envoyer_commande(client, "EHLO localhost")
         
-        # Puis on envoie HELO (qui devrait réussir avec 250)
         print("...Test HELO...")
         envoyer_commande(client, "HELO localhost")
         
-        # Interaction avec l'utilisateur pour envoyer plusieurs mails
+        # Boucle interactive
         while True:
             print("=== Client SMTP - Envoi d'email ===\n")
             choix = input("Tapez 'send' pour envoyer un mail, 'rcv' pour recevoir des informations, 'quit' pour fermer la connexion : ").strip().lower()
             
-            #cas QUIT
             if choix == "quit":
                 envoyer_commande(client, "QUIT")
                 break
 
-            # Cas SMTP
             elif choix == "send":
                 expediteur, destinataire, message = choix_send()
+                traiter_commande_send(client, expediteur, destinataire, message)
 
-                # Envoi des commandes SMTP
-                envoyer_commande(client, f"MAIL FROM:<{expediteur}>")
-                envoyer_commande(client, f"RCPT TO:<{destinataire}>")
-                envoyer_commande(client, "DATA")
-
-                # Envoi du corps et terminaison DATA par un point
-                print(f">> {message}")
-                client.sendall(f"{message}\r\n".encode('utf-8'))
-                envoyer_commande(client, ".")
-                print("Mail envoyé avec succès.\n")
-
-            # Cas POP3
             elif choix == "rcv":
                 print("=== Client POP3 - Réception d'informations ===\n")
-                choixmailpop3=input ("Veuillez saisir le mail de la personne que vous souhaitez consulter : ")
+                choixmailpop3 = input("Veuillez saisir le mail de la personne que vous souhaitez consulter : ")
                 while not valider_email(choixmailpop3):
                     choixmailpop3 = input("Email invalide, (format : exemple@domaine.com). Veuillez saisir le mail de la personne que vous souhaitez consulter : ")
-
-                choixcommandepop3 = input("Veuillez choisir l'une des commandes suivantes : \n- 'stat' pour obtenir le nombre de messages et la taille totale \n" \
-                "- 'list' pour obtenir la liste des messages avec leur taille\n" \
-                "- 'retr n' pour récupérer le message d'indice n : ").strip().lower()
-
-                if choixcommandepop3 == "stat":
-                    retour = envoyer_commande(client, "STAT " + choixmailpop3)
-                    gestion_commande_stat(retour)
-
-                elif choixcommandepop3 == "list":
-                    retour = envoyer_commande(client, "LIST " + choixmailpop3) 
-                    gestion_commande_list(retour)
-
-
-                elif choixcommandepop3.split()[0] == "retr":
-                    partspop3 = choixcommandepop3.split() 
-                    if (len(partspop3) == 2 and partspop3[1].isdigit()):
-                        retour=envoyer_commande(client, f"RETR {partspop3[1]} {choixmailpop3}")
-                        gestion_commande_retr(retour)
-                    else:
-                        print("\nUsage incorrect de RETR\n")
-
-                else:
-                    print("Commande non reconnue. Tapez 'stat', 'list' ou 'retr n'.")
+                
+                session_pop3(choixmailpop3)
 
             else:
-                print("Commande non reconnue. Tapez 'send' ou 'quit'.")
+                print("Commande non reconnue. Tapez 'send', 'rcv' ou 'quit'.\n")
 
     except Exception as e:
         print(f"Erreur : {e}")

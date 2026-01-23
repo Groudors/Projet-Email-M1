@@ -1,0 +1,139 @@
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                   ARCHITECTURE DES THREADS EXPLIQUÉE                                    ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+THREAD PRINCIPAL (principal.py)
+│
+├─ Crée la couche de stockage partagée (StockageMessage)
+│
+├─ Lance THREAD SERVEUR SMTP (port 65434)
+│   │
+│   ├─ Boucle d'écoute : attend les connexions entrantes
+│   │
+│   ├─ Client SMTP 1 se connecte
+│   │   └─ THREAD CLIENT SMTP 1 créé
+│   │       └─ Gère la communication (HELO, MAIL FROM, RCPT TO, DATA, QUIT)
+│   │
+│   ├─ Client SMTP 2 se connecte
+│   │   └─ THREAD CLIENT SMTP 2 créé
+│   │       └─ Gère sa propre communication
+│   │
+│   └─ Les clients peuvent communiquer EN PARALLÈLE sans se bloquer
+│
+└─ Lance THREAD SERVEUR POP3 (port 65433)
+    │
+    ├─ Boucle d'écoute : attend les connexions entrantes
+    │
+    ├─ Client POP3 1 se connecte
+    │   └─ THREAD CLIENT POP3 1 créé
+    │       └─ Gère la communication (STAT, LIST, RETR, QUIT)
+    │
+    └─ Client POP3 2 se connecte
+        └─ THREAD CLIENT POP3 2 créé
+            └─ Gère sa propre communication
+
+
+════════════════════════════════════════════════════════════════════════════
+
+DIFFÉRENCE AVEC L'APPROCHE PRÉCÉDENTE (monolithique) :
+
+┌─ Avant (Serveur.py) ─────────────────────────────────────────────────────
+│                                                                             							
+│ Thread Principal                                                           
+│   └─ Une boucle d'écoute unique sur port 65434                           
+│       ├─ Client 1 → Thread Client 1 (SMTP)                               
+│       ├─ Client 2 → Thread Client 2 (SMTP)                               
+│       ├─ Client 3 → Thread Client 3 (POP3 - mélangé!)                   
+│       └─ ...                                                               
+│                                                                             
+│ PROBLÈME : Tous les protocoles sur le même port, code mélangé             
+└────────────────────────────────────────────────────────────────────
+
+┌─ Après (architecture objet) ──────────────────────────────────────────────
+│                                                                             				  
+│ Thread Principal                                                                            
+│   ├─ Thread Serveur SMTP (port 65434)                                                      
+│   │   ├─ Client 1 → Thread Client SMTP 1                                                   
+│   │   ├─ Client 2 → Thread Client SMTP 2                                                  
+│   │   └─ ...                                                                              
+│   │                                                                                        
+│   └─ Thread Serveur POP3 (port 65433)                                                      
+│       ├─ Client 1 → Thread Client POP3 1                                                   
+│       ├─ Client 2 → Thread Client POP3 2                                                    
+│       └─ ...                                                                                  
+│                                                                                                
+│ AVANTAGE : Deux ports séparés, code organisé, vraiment parallèle                              
+└───────────────────────────────────────────────────────────────────
+
+
+════════════════════════════════════════════════════════════════════════════
+
+FONCTIONNEMENT DES THREADS CLIENTS :
+
+Exemple : Client SMTP 1 envoie un email
+
+Serveur SMTP (thread serveur)
+│
+└─ Client se connecte → Crée THREAD CLIENT SMTP 1
+   │
+   ├─ Reçoit : "HELO localhost"
+   │  └─ Répond : "250 Ok"
+   │
+   ├─ Reçoit : "MAIL FROM:<alice@example.com>"
+   │  └─ Répond : "250 Sender OK"
+   │
+   ├─ Reçoit : "RCPT TO:<bob@example.com>"
+   │  └─ Répond : "250 Recipient OK"
+   │
+   ├─ Reçoit : "DATA"
+   │  └─ Répond : "354 Envoyez votre mail"
+   │     (Entre en mode data, collecte les lignes)
+   │
+   ├─ Reçoit : "Bonjour Bob!"
+   │  └─ Ajoute à contenu_message
+   │
+   ├─ Reçoit : "."
+   │  ├─ Répond : "250 OK"
+   │  ├─ Appelle stockage.sauvegarder_message() ← THREAD-SAFE (verrou)
+   │  └─ Réinitialise les variables
+   │
+   └─ Reçoit : "QUIT"
+      ├─ Répond : "221 Fermeture connexion"
+      └─ Ferme la socket et termine le THREAD
+
+
+════════════════════════════════════════════════════════════════════════════
+
+THREAD-SAFETY :
+
+Deux clients SMTP envoient des emails simultanément :
+
+Client 1 Thread              |  Client 2 Thread
+                              |
+Appelle sauvegarder_message() | Appelle sauvegarder_message()
+  ↓ (demande verrou)          |
+  Attend... le verrou         | Attend... le verrou
+    (Client 2 l'a)            |
+                              | Acquiert le verrou ✓
+                              | Écrit le fichier de bob@
+                              | Libère le verrou
+Acquiert le verrou ✓          |
+Écrit le fichier d'alice@     | (prêt pour sa tâche)
+Libère le verrou              |
+
+RÉSULTAT : Les deux fichiers sont écrits proprement, sans corruption !
+
+
+════════════════════════════════════════════════════════════════════════════
+
+RÉSUMÉ :
+
+* Un seul point d'entrée (principal.py)
+* Deux ports séparé (SMTP 65434, POP3 65433)
+* Deux boucles d'écoute indépendantes (dans des threads serveurs)
+* Chaque client obtient son propre thread (gestion sans blocage)
+* Stockage partagé et thread-safe avec verrou
+* Code séparé par protocole (séparation des responsabilités)
+
+
