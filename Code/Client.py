@@ -53,6 +53,67 @@ def envoyer_commande(client, commande):
 def verification_retour(reponse):
     return reponse[0]=="501"
 
+
+
+def gestion_commande_list(retour):
+    parts = retour.split()
+    
+    if verification_retour(parts):
+        print(f" Retour impossible : {retour}\n")
+        return
+    elif len(parts) > 1:
+        print("\n=== Liste des messages ===")
+        elements = retour.split(',')
+        print(f"\n{'ID':<10} | {'Expéditeur':<25} | {'Taille (octets)':<20}")
+        print("-" * 60)
+        try:
+            for i in range(0, len(elements), 3):
+                uid = elements[i].strip().strip("[").strip("]")
+                expediteur = elements[i+1].strip().strip("'\"")
+                taille = elements[i+2].strip().strip("[").strip("]")
+                print(f"{uid:<10} | {expediteur:<25} | {taille:<20}")
+        except IndexError:
+            print("   (Problème de formatage des données) \n")
+
+def gestion_commande_stat(retour):
+    parts = retour.split()
+    if verification_retour(parts):
+        print("\n===  Retour Impossible  === \n")
+        print(f"  {retour}\n")
+        return
+    elif len(parts) >= 2:
+        print(f"\n=== Statistiques === \n")
+        print(f"Nombre de messages : {parts[0]}")
+        print(f"Taille totale : {parts[1]} octets\n")
+
+def gestion_commande_retr(retour):
+    parts = retour.split()
+    if verification_retour(parts):
+        print(f"{retour}\n")
+        return
+    else : 
+        print("\n=== Contenu du message ===\n")
+        message_lines = retour.split('\\n')
+        for line in message_lines:
+            print(line)
+        print()
+
+def choix_send():
+    expediteur = input("Expéditeur: ")
+    while not valider_email(expediteur):
+        expediteur = input("Email invalide, (format : exemple@domaine.com). Expéditeur: ")
+
+    destinataire = input("Destinataire: ")
+    while not valider_email(destinataire):
+        destinataire = input("Email invalide, (format : exemple@domaine.com). Destinataire: ")
+        
+    message = input("Message: ")
+    while not message:
+        print("Le message ne peut pas être vide. Veuillez saisir un message.")
+        message = input("Message: ")
+    return expediteur, destinataire, message
+    
+
 # Fonction principale pour envoyer un email via SMTP et interagir en POP3
 def envoyer_email():
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -84,17 +145,7 @@ def envoyer_email():
 
             # Cas SMTP
             elif choix == "send":
-                expediteur = input("Expéditeur: ")
-                while not valider_email(expediteur):
-                    expediteur = input("Email invalide, (format : exemple@domaine.com). Expéditeur: ")
-                
-                destinataire = input("Destinataire: ")
-                while not valider_email(destinataire):
-                    destinataire = input("Email invalide, (format : exemple@domaine.com). Destinataire: ")
-                message = input("Message: ")
-                while not message:
-                    print("Le message ne peut pas être vide. Veuillez saisir un message.")
-                    message = input("Message: ")
+                expediteur, destinataire, message = choix_send()
 
                 # Envoi des commandes SMTP
                 envoyer_commande(client, f"MAIL FROM:<{expediteur}>")
@@ -120,49 +171,18 @@ def envoyer_email():
 
                 if choixcommandepop3 == "stat":
                     retour = envoyer_commande(client, "STAT " + choixmailpop3)
-                    parts = retour.split()
-                    if verification_retour(parts):
-                        print(f"{parts}\n")
-                        continue
-                    elif len(parts) >= 2:
-                        print(f"\n=== Statistiques ===")
-                        print(f"Nombre de messages : {parts[0]}")
-                        print(f"Taille totale : {parts[1]} octets\n")
-
+                    gestion_commande_stat(retour)
 
                 elif choixcommandepop3 == "list":
-                    retour = envoyer_commande(client, "LIST " + choixmailpop3)
-                    print("\n=== Liste des messages ===")
-                    parts = retour.split()
-                    if verification_retour(parts):
-                        print(f"{retour}\n")
-                        continue
+                    retour = envoyer_commande(client, "LIST " + choixmailpop3) 
+                    gestion_commande_list(retour)
 
-                    elif len(parts) > 1:
-                        elements = retour.split(',')
-                        print(f"\n{'ID':<10} | {'Expéditeur':<25} | {'Taille (octets)':<20}")
-                        print("-" * 60)
-                        try:
-                            for i in range(0, len(elements), 3):
-                                uid = elements[i].strip()
-                                expediteur = elements[i+1].strip().strip("'\"")
-                                taille = elements[i+2].strip()
-                                print(f"{uid:<10} | {expediteur:<25} | {taille:<20}")
-                        except IndexError:
-                            print("   (Problème de formatage des données)")
-                        print()
-                    else:
-                        print("   (Aucun message)\n")
 
                 elif choixcommandepop3.split()[0] == "retr":
-                    partspop3 = choixcommandepop3.split()
-                    if verification_retour(parts):
-                        print(f"{parts}\n")
-                        continue
-                    elif len(partspop3) == 2 and partspop3[1].isdigit():
-                        print()
-                        envoyer_commande(client, f"RETR {partspop3[1]} {choixmailpop3}")
-                        print()
+                    partspop3 = choixcommandepop3.split() 
+                    if (len(partspop3) == 2 and partspop3[1].isdigit()):
+                        retour=envoyer_commande(client, f"RETR {partspop3[1]} {choixmailpop3}")
+                        gestion_commande_retr(retour)
                     else:
                         print("\nUsage incorrect de RETR\n")
 
