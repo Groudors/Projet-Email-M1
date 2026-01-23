@@ -24,11 +24,6 @@ FONCTIONNALITÉS (VERSION 3.0) :
        - STAT : permet d'obtenir le nombre de messages et la taille totale.
        - LIST : permet d'obtenir la liste des messages avec leur taille.
        - RETR n : permet de récupérer le message n.
-
-    Compatibilité :
-      Compatible avec les serveurs SMTP standards incluant celui du projet.
-      Peut être utilisé avec Thunderbird en tant que serveur SMTP personnalisé.
-
 """
 
 # Configuration

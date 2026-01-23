@@ -2,8 +2,8 @@ import os
 import threading
 
 """
-Auteurs       : Bohy, Abbadi, Cherraf 
-Promotion     : M1 STRI     Date          : Janvier 2026       Version       : 3.0
+Auteurs: Bohy, Abbadi, Cherraf 
+Promotion: M1 STRI     Date  : Janvier 2026       Version : 3.0
 
 DESCRIPTION :
 Couche de stockage centralisée pour SMTP et POP3.

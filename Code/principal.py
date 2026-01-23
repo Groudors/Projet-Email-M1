@@ -4,8 +4,8 @@ from serveur_smtp import ServeurSMTP
 from serveur_pop3 import ServeurPOP3
 
 """
-Auteurs       : Bohy, Abbadi, Cherraf 
-Promotion     : M1 STRI     Date          : Janvier 2026       Version       : 3.0
+Auteurs: Bohy, Abbadi, Cherraf 
+Promotion: M1 STRI     Date  : Janvier 2026       Version : 3.0
 
 DESCRIPTION :
 Point d'entrée unique pour lancer les serveurs SMTP et POP3.

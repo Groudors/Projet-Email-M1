@@ -109,20 +109,20 @@ THREAD-SAFETY :
 
 Deux clients SMTP envoient des emails simultanément :
 
-Client 1 Thread              |  Client 2 Thread
+Client 1 Thread               |  Client 2 Thread
                               |
 Appelle sauvegarder_message() | Appelle sauvegarder_message()
   ↓ (demande verrou)          |
   Attend... le verrou         | Attend... le verrou
     (Client 2 l'a)            |
-                              | Acquiert le verrou ✓
+                              | Acquiert le verrou 
                               | Écrit le fichier de bob@
                               | Libère le verrou
-Acquiert le verrou ✓          |
+Acquiert le verrou            |
 Écrit le fichier d'alice@     | (prêt pour sa tâche)
 Libère le verrou              |
 
-RÉSULTAT : Les deux fichiers sont écrits proprement, sans corruption !
+RÉSULTAT : Les deux fichiers sont écrits proprement, sans corruption.
 
 
 ════════════════════════════════════════════════════════════════════════════

@@ -2,8 +2,8 @@ import threading
 from serveur_messagerie import ServeurMessagerie
 
 """
-Auteurs       : Bohy, Abbadi, Cherraf 
-Promotion     : M1 STRI     Date          : Janvier 2026       Version       : 3.0
+Auteurs: Bohy, Abbadi, Cherraf 
+Promotion: M1 STRI     Date  : Janvier 2026       Version : 3.0
 
 DESCRIPTION :
 Implémentation du serveur POP3 (Post Office Protocol).
@@ -45,13 +45,13 @@ class ServeurPOP3(ServeurMessagerie):
                     print(f"[POP3] [{adresse_client}] Reçu: {commande}")
                     
                     # Traite la commande
-                    connexion_active = self._traiter_commandes(commande, socket_client)
+                    connexion_active = self.traiter_commandes(commande, socket_client)
                 
                 except Exception as e:
                     print(f"[POP3] Erreur: {e}")
                     break
     
-    def _traiter_commandes(self, commande, socket_client):
+    def traiter_commandes(self, commande, socket_client):
         """
         Traite une commande POP3
         
@@ -71,20 +71,20 @@ class ServeurPOP3(ServeurMessagerie):
                 return False
             
             case "STAT":
-                self._traiter_stat(commande, socket_client)
+                self.traiter_stat(commande, socket_client)
             
             case "LIST":
-                self._traiter_list(commande, socket_client)
+                self.traiter_list(commande, socket_client)
             
             case "RETR":
-                self._traiter_retr(commande, socket_client)
+                self.traiter_retr(commande, socket_client)
             
             case _:
                 socket_client.sendall("-ERR Commande non implémentée\r\n".encode('utf-8'))
         
         return True
     
-    def _traiter_stat(self, commande, socket_client):
+    def traiter_stat(self, commande, socket_client):
         """
         Traite la commande STAT
         Format: STAT email@domain.com
@@ -104,7 +104,7 @@ class ServeurPOP3(ServeurMessagerie):
             taille_totale = self.stockage.obtenir_taille_totale(boite_mail)
             socket_client.sendall(f"+OK {nb_messages} {taille_totale}\r\n".encode('utf-8'))
     
-    def _traiter_list(self, commande, socket_client):
+    def traiter_list(self, commande, socket_client):
         """
         Traite la commande LIST
         Format: LIST email@domain.com
@@ -124,7 +124,7 @@ class ServeurPOP3(ServeurMessagerie):
             # Format: [[ID, expéditeur, taille], ...]
             socket_client.sendall(f"+OK {liste_messages}\r\n".encode('utf-8'))
     
-    def _traiter_retr(self, commande, socket_client):
+    def traiter_retr(self, commande, socket_client):
         """
         Traite la commande RETR
         Format: RETR indice email@domain.com

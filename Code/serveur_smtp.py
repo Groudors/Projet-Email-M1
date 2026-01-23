@@ -2,8 +2,8 @@ import threading
 from serveur_messagerie import ServeurMessagerie
 
 """
-Auteurs       : Bohy, Abbadi, Cherraf 
-Promotion     : M1 STRI     Date          : Janvier 2026       Version       : 3.0
+Auteurs: Bohy, Abbadi, Cherraf 
+Promotion: M1 STRI     Date  : Janvier 2026       Version : 3.0
 
 DESCRIPTION :
 Implémentation du serveur SMTP (Simple Mail Transfer Protocol).

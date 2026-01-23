@@ -3,8 +3,8 @@ import threading
 from abc import ABC, abstractmethod
 
 """
-Auteurs       : Bohy, Abbadi, Cherraf 
-Promotion     : M1 STRI     Date          : Janvier 2026       Version       : 3.0
+Auteurs: Bohy, Abbadi, Cherraf 
+Promotion: M1 STRI     Date  : Janvier 2026       Version : 3.0
 
 DESCRIPTION :
 Classe abstraite de base pour les serveurs de messagerie.
