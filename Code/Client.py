@@ -50,6 +50,9 @@ def envoyer_commande(client, commande):
     print(f"<< {reponse.strip()}")
     return reponse
 
+def verification_retour(reponse):
+    return reponse[0]=="502"
+
 # Fonction principale pour envoyer un email via SMTP et interagir en POP3
 def envoyer_email():
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -118,7 +121,10 @@ def envoyer_email():
                 if choixcommandepop3 == "stat":
                     retour = envoyer_commande(client, "STAT " + choixmailpop3)
                     parts = retour.split()
-                    if len(parts) >= 2:
+                    if verification_retour(parts):
+                        print(f"{parts}\n")
+                        continue
+                    elif len(parts) >= 2:
                         print(f"\n=== Statistiques ===")
                         print(f"Nombre de messages : {parts[0]}")
                         print(f"Taille totale : {parts[1]} octets\n")
@@ -127,7 +133,11 @@ def envoyer_email():
                     retour = envoyer_commande(client, "LIST " + choixmailpop3)
                     print("\n=== Liste des messages ===")
                     nettoye = retour.replace('[', '').replace(']', '')
-                    if len(nettoye.strip()) > 0:
+                    print(parts)
+                    if verification_retour(nettoye):
+                        print(f"{parts}\n")
+                        continue
+                    elif len(nettoye.strip()) > 0:
                         elements = nettoye.split(',')
                         print(f"\n{'ID':<10} | {'Expéditeur':<25} | {'Taille (octets)':<20}")
                         print("-" * 60)
@@ -145,7 +155,10 @@ def envoyer_email():
 
                 elif choixcommandepop3.split()[0] == "retr":
                     partspop3 = choixcommandepop3.split()
-                    if len(partspop3) == 2 and partspop3[1].isdigit():
+                    if verification_retour(parts):
+                        print(f"{parts}\n")
+                        continue
+                    elif len(partspop3) == 2 and partspop3[1].isdigit():
                         print()
                         envoyer_commande(client, f"RETR {partspop3[1]} {choixmailpop3}")
                         print()

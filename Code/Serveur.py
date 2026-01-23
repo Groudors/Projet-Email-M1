@@ -38,21 +38,23 @@ DOSSIER_MAIL = 'Boîte_mail'
 
 stop_server = False
 
+# =============================================== Partie Initialisation Serveur ===============================================
+
 def initialisation_serveur():   
     # On crée le dossier de stockage des mails s'il n'existe pas
     if not os.path.exists(DOSSIER_MAIL):
         os.makedirs(DOSSIER_MAIL)
 
-    # Etape 1 : création de la socket d'écoute
+    # Création de la socket d'écoute
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as ecoute:
-        # Etape 1 suite : liaison de la socket d'écoute 
+        # Liaison de la socket d'écoute 
         ecoute.bind(('', PORT))
-        # Etape 2 : ouverture du service
+        # Ouverture du service
         ecoute.listen()
         ecoute.settimeout(1.0)
     
         while not stop_server:
-            # Etape 3 : attente et acceptation d'une nouvelle connexion
+            # Attente et acceptation d'une nouvelle connexion
             try:
                 service, addr = ecoute.accept()
             except socket.timeout:
@@ -62,6 +64,9 @@ def initialisation_serveur():
             thread_serveur = threading.Thread(target=gestion_client, args=(service, addr))
             thread_serveur.start()
 
+
+
+#  =============================================== Partie Gestion Client / Commandes ===============================================
 
 def gestion_client(service, adresse):
     # Gère la communication avec un client SMTP
@@ -106,6 +111,9 @@ def gestion_client(service, adresse):
                     contenu_message.append(donnees)
 
 
+
+
+
 def gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_message):
     # Plus besoin de passer dictionnaire_mails, on le charge dans les cases qui en ont besoin
     commande = donnees.upper().split()[0] 
@@ -121,20 +129,11 @@ def gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_
             
         # Cas MAIL FROM:<adresse>
         case "MAIL":
-            if "FROM:" in donnees.upper():
-                expediteur = donnees.split("FROM:",1)[1].strip().strip('<>')
-                service.sendall("250 Sender OK\r\n".encode('utf-8'))
-            else:
-                service.sendall("501 Erreur syntaxe\r\n".encode('utf-8'))
+            expediteur = facto_mail_from(donnees,service)
         
         # Gestion reception du message
         case "RCPT":
-            #On vérifie qu'il s'agit bien de "RCPT TO"
-            if "TO:" in donnees.upper():
-                destinataire = donnees.split("TO:",1)[1].strip().strip('<>')
-                service.sendall("250 Recipient OK\r\n".encode('utf-8'))
-            else:
-                service.sendall("501 Erreur syntaxe\r\n".encode('utf-8'))
+            destinataire = facto_rcpt_to(donnees,service)
         
         # Gestion de la commande DATA 
         case "DATA":
@@ -145,60 +144,46 @@ def gestion_commandes(donnees,service,expediteur,destinataire,mode_data,contenu_
             service.sendall("221 fermeture connexion\r\n".encode('utf-8'))
             return expediteur,destinataire,mode_data,contenu_message,False  
 
-        # Maxime, tu devras utiliser le destinataire récupéré avec les commandes après pour lancer la création du dictionnaire
-        # puis il faudra juste que tu intègre appelle les fonctions correspondantes dans les cases suivants avec le dictionnaire.
-        # en renvoyant les résultats vers le client (idem de comment c'est gêrer au dessus)
         case "STAT":
-            # Format reçu: "STAT email@domain.com"
-            parties = donnees.split()
-            if len(parties) >= 2:
-                destinataire = parties[1]
-                dictionnaire_mails = charger_boite_mail(destinataire)
-                if dictionnaire_mails is not None:
-                    nbr, taille = commande_stat(dictionnaire_mails)
-                    service.sendall(f"{nbr} {taille}\r\n".encode('utf-8'))
-                else:
-                    service.sendall("Erreur : Boîte mail inexistante\r\n".encode('utf-8'))
-            else:
-                service.sendall("501 Erreur syntaxe\r\n".encode('utf-8'))
+            facto_stat(donnees,service)
         
         case "LIST":
-            # Format reçu: "LIST email@domain.com"
-            parties = donnees.split()
-            if len(parties) >= 2:
-                destinataire = parties[1]
-                dictionnaire_mails = charger_boite_mail(destinataire)
-                if dictionnaire_mails is not None:
-                    liste_mail = commande_list(dictionnaire_mails)
-                    service.sendall(f"{liste_mail}\r\n".encode('utf-8'))
-                else:
-                    service.sendall("Erreur : Boîte mail inexistante\r\n".encode('utf-8'))
-            else:
-                service.sendall("501 Erreur syntaxe\r\n".encode('utf-8'))
+            facto_list(donnees,service)
         
         case "RETR":
-            # Format reçu: "RETR indice email@domain.com"
-            parties = donnees.split()
-            if len(parties) >= 3 and parties[1].isdigit():
-                indice_msg = int(parties[1])
-                destinataire = parties[2]
-                dictionnaire_mails = charger_boite_mail(destinataire)
-                
-                if dictionnaire_mails is None:
-                    service.sendall("Erreur : Boîte mail inexistante\r\n".encode('utf-8'))
-                elif not validation_id(indice_msg, dictionnaire_mails):
-                    service.sendall("Erreur : ID message inexistant\r\n".encode('utf-8'))
-                else:
-                    message = commande_retr(dictionnaire_mails, indice_msg)
-                    service.sendall(f"{message}\r\n".encode('utf-8'))
-            else:
-                service.sendall("501 Erreur syntaxe. Format: RETR indice email@domain.com\r\n".encode('utf-8'))
+            facto_retr(donnees,service)
 
         case _:
             service.sendall("502 Command not implemented\r\n".encode('utf-8'))
     return expediteur,destinataire,mode_data,contenu_message,True    
 
 
+
+
+# ================================================ Partie Code Auxiliaire ================================================
+
+# ================================== Factorisation de gestion des commandes ==============================================
+
+def facto_mail_from(donnees,service):
+    # Extrait l'adresse e-mail de l'expéditeur de la commande MAIL FROM
+    if "FROM:" in donnees.upper():
+        expediteur = donnees.split("FROM:",1)[1].strip().strip('<>')
+        service.sendall("250 Sender OK\r\n".encode('utf-8'))
+        return expediteur
+    service.sendall("501 Erreur syntaxe\r\n".encode('utf-8'))
+    return None
+
+
+def facto_rcpt_to(donnees,service):
+    # Extrait l'adresse e-mail du destinataire de la commande RCPT TO
+    if "TO:" in donnees.upper():
+        destinataire = donnees.split("TO:",1)[1].strip().strip('<>')
+        service.sendall("250 Recipient OK\r\n".encode('utf-8'))
+        return destinataire
+    service.sendall("501 Erreur syntaxe\r\n".encode('utf-8'))
+    return None
+
+# ================================== Partie Sauvegarde des messages ==============================================
 
 def sauvegarder_message(expediteur, destinataire, contenu_message):
     #Sauvegarde le message dans un fichier correspondant au destinataire
@@ -213,7 +198,55 @@ def sauvegarder_message(expediteur, destinataire, contenu_message):
             f.write("\n" + "="*50 + "\n\n")
         print(f"Message enregistré dans {fichier_mail}")
 
-# Partie Commandes POP3
+# ================================= Partie Commandes Factorisation POP3 ==============================================
+def facto_stat(donnees, service):
+    # Format reçu: "STAT email@domain.com"
+            parties = donnees.split()
+            if len(parties) >= 2:
+                destinataire = parties[1]
+                dictionnaire_mails = charger_boite_mail(destinataire)
+                if dictionnaire_mails is not None:
+                    nbr, taille = commande_stat(dictionnaire_mails)
+                    service.sendall(f"{nbr} {taille}\r\n".encode('utf-8'))
+                else:
+                    service.sendall("501 Boîte mail inexistante\r\n".encode('utf-8'))
+            else:
+                service.sendall("501 Erreur syntaxe\r\n".encode('utf-8'))
+
+def facto_list(donnees, service):
+    # Format reçu: "LIST email@domain.com"
+            parties = donnees.split()
+            if len(parties) >= 2:
+                destinataire = parties[1]
+                dictionnaire_mails = charger_boite_mail(destinataire)
+                if dictionnaire_mails is not None:
+                    liste_mail = commande_list(dictionnaire_mails)
+                    service.sendall(f"{liste_mail}\r\n".encode('utf-8'))
+                else:
+                    service.sendall("501 Boîte mail inexistante\r\n".encode('utf-8'))
+            else:
+                service.sendall("501 Erreur syntaxe\r\n".encode('utf-8'))
+
+def facto_retr(donnees, service):
+     # Format reçu: "RETR indice email@domain.com"
+            parties = donnees.split()
+            if len(parties) >= 3 and parties[1].isdigit():
+                indice_msg = int(parties[1])
+                destinataire = parties[2]
+                dictionnaire_mails = charger_boite_mail(destinataire)
+                
+                if dictionnaire_mails is None:
+                    service.sendall("501 Boîte mail inexistante\r\n".encode('utf-8'))
+                elif not validation_id(indice_msg, dictionnaire_mails):
+                    service.sendall("501 ID message inexistant\r\n".encode('utf-8'))
+                else:
+                    message = commande_retr(dictionnaire_mails, indice_msg)
+                    service.sendall(f"{message}\r\n".encode('utf-8'))
+            else:
+                service.sendall("501 Erreur syntaxe. Format: RETR indice email@domain.com\r\n".encode('utf-8'))
+
+
+# ================================= Partie Commandes POP3 ==============================================
 
 def commande_stat( dictionnaire_mails):
     nombre_messages = len(dictionnaire_mails)
@@ -239,10 +272,9 @@ def validation_email(email, dictionnaire_mails):
 def validation_id(id, dictionnaire_mails):
     return id in dictionnaire_mails
         
-# Dictionnaire_mails est un dictionnaire de dictionnaires
-# La clé du dictionnaire principal est l'id du destinataire et la
+
+# Dictionnaire_mails est un dictionnaire de dictionnaires. La clé du dictionnaire principal est l'id du destinataire et la
 #  valeur est un dictionnaire contenant les messages et la taille du message
-# Partie Chargement des mails
 def charger_boite_mail(adresse_mail):
     # Récupère les mails pour une adresse spécifique
     chemin_fichier = os.path.join(DOSSIER_MAIL, f"{adresse_mail}.txt")

@@ -34,3 +34,9 @@ Message:
 j'aime ce que tu fait bob
 ==================================================
 
+De: Jeanmahmud@infra.stri
+Pour: bob@infra.stri
+Message:
+attentat
+==================================================
+
